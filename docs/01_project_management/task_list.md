@@ -1,6 +1,6 @@
 # Danh sách công việc & người phụ trách
 
-## 1. Tổng quan phân công 7 thành viên
+## Tổng quan phân công 7 thành viên
 
 | Thành viên | Phụ trách chính | Trọng tâm |
 |---|---|---|
