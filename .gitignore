@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Dữ liệu sinh ra khi chạy chương trình (giữ lại cấu trúc thư mục, không commit file thật)
+data/output/**/*
+!data/output/**/.gitkeep
+results/figures/*
+results/tables/*
+results/reports/*
+!results/figures/.gitkeep
+!results/tables/.gitkeep
+!results/reports/.gitkeep
+
+# Ảnh dataset lớn (tùy chọn — bỏ comment nếu không muốn đưa ảnh lên git)
+# data/input/**/*.jpg
+# data/input/**/*.png
