@@ -56,4 +56,8 @@ Có nhiều họ wavelet (wavelet family) khác nhau, mỗi loại có hình d�
 - Cần **đối xứng, ít méo pha** khi so sánh cấu trúc/kết cấu → Symlets.
 - Cần **xấp xỉ tốt vùng phẳng** (ảnh có nhiều vùng màu đồng nhất) → Coiflets.
 
+<<<<<<< HEAD
 Đề tài này sẽ thử nghiệm và so sánh thực nghiệm các loại: **Haar, db2, db4, db8, sym2, sym4, coif1** để chọn ra loại phù hợp nhất cho bài toán so sánh độ giống nhau giữa các ảnh (xem `experiments/compare_wavelets.py`).
+=======
+Đề tài này sẽ thử nghiệm và so sánh thực nghiệm các loại: **Haar, db2, db4, db8, sym2, sym4, coif1** để chọn ra loại phù hợp nhất cho bài toán so sánh độ giống nhau giữa các ảnh (xem `experiments/compare_wavelets.py`).
+>>>>>>> f28b4cd ( cap nhat)

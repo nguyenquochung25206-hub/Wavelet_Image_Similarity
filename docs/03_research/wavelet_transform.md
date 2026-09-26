@@ -102,4 +102,8 @@ Minh họa cấu trúc phân rã 2 mức (2-level decomposition):
 - **Level cao (3+):** ảnh xấp xỉ (LL) càng thu nhỏ, càng mang tính "tổng quan cấp cao" (high-level structure), lược bỏ nhiều chi tiết/nhiễu → phù hợp khi chỉ cần so sánh bố cục tổng thể, hoặc muốn giảm chiều dữ liệu mạnh hơn.
 - Số level tối đa phụ thuộc vào kích thước ảnh (ảnh càng nhỏ thì càng ít lần chia đôi được).
 
+<<<<<<< HEAD
 Việc chọn level phù hợp là một tham số quan trọng cần thử nghiệm trong `compare_wavelets.py`, cùng với việc chọn loại wavelet (Haar, db2, db4, db8, sym2, sym4, coif1).
+=======
+Việc chọn level phù hợp là một tham số quan trọng cần thử nghiệm trong `compare_wavelets.py`, cùng với việc chọn loại wavelet (Haar, db2, db4, db8, sym2, sym4, coif1).
+>>>>>>> f28b4cd ( cap nhat)
