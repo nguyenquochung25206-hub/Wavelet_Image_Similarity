@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-
 """
 Integration tests for the Wavelet Image Similarity pipeline.
 
@@ -16,9 +14,6 @@ Pipeline:
     Hamming Distance
       ↓
     Similarity
-
-These tests focus on the integration between modules rather than testing
-every internal implementation detail of each module.
 """
 
 from pathlib import Path
@@ -46,17 +41,7 @@ DISSIMILAR_DIR = DATA_DIR / "dissimilar"
 
 def get_image_pair(pair_dir: Path):
     """
-    Return image_01.jpg and image_02.jpg from a pair directory.
-
-    Parameters
-    ----------
-    pair_dir : Path
-        Directory containing image_01.jpg and image_02.jpg.
-
-    Returns
-    -------
-    tuple[Path, Path]
-        Paths to the two images.
+    Return image_01.jpg and image_02.jpg.
     """
 
     image_01 = pair_dir / "image_01.jpg"
@@ -67,29 +52,24 @@ def get_image_pair(pair_dir: Path):
 
 def load_image(path: Path):
     """
-    Load an image using OpenCV.
+    Load image using the project's preprocessing loader.
 
-    Raises
-    ------
-    AssertionError
-        If the image cannot be loaded.
+    This avoids cv2.imread() Unicode path problems on Windows.
     """
 
-    assert path.exists(), f"Image does not exist: {path}"
+    from src.preprocessing.image_preprocessor import (
+        load_image as project_load_image
+    )
 
-    image = cv2.imread(str(path))
-
-    assert image is not None, f"Could not load image: {path}"
-
-    return image
+    return project_load_image(path)
 
 
 # ---------------------------------------------------------------------------
-# Dataset tests
+# Dataset existence
 # ---------------------------------------------------------------------------
 
 def test_similar_dataset_exists():
-    """Check that the Similar dataset exists."""
+    """Check that Similar dataset exists."""
 
     assert SIMILAR_DIR.exists(), (
         f"Similar dataset does not exist: {SIMILAR_DIR}"
@@ -97,40 +77,54 @@ def test_similar_dataset_exists():
 
 
 def test_dissimilar_dataset_exists():
-    """Check that the Dissimilar dataset exists."""
+    """Check that Dissimilar dataset exists."""
 
     assert DISSIMILAR_DIR.exists(), (
         f"Dissimilar dataset does not exist: {DISSIMILAR_DIR}"
     )
 
 
+# ---------------------------------------------------------------------------
+# Dataset pair loading
+# ---------------------------------------------------------------------------
+
 def test_similar_pair_can_be_loaded():
-    """
-    Check that a Similar image pair can be loaded successfully.
-    """
+    """Check that a Similar image pair can be loaded."""
 
     pair_dir = SIMILAR_DIR / "pair_01"
 
-    image_01_path, image_02_path = get_image_pair(pair_dir)
+    image_01_path, image_02_path = get_image_pair(
+        pair_dir
+    )
 
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
+    image_01 = load_image(
+        image_01_path
+    )
+
+    image_02 = load_image(
+        image_02_path
+    )
 
     assert image_01.size > 0
     assert image_02.size > 0
 
 
 def test_dissimilar_pair_can_be_loaded():
-    """
-    Check that a Dissimilar image pair can be loaded successfully.
-    """
+    """Check that a Dissimilar image pair can be loaded."""
 
     pair_dir = DISSIMILAR_DIR / "pair_01"
 
-    image_01_path, image_02_path = get_image_pair(pair_dir)
+    image_01_path, image_02_path = get_image_pair(
+        pair_dir
+    )
 
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
+    image_01 = load_image(
+        image_01_path
+    )
+
+    image_02 = load_image(
+        image_02_path
+    )
 
     assert image_01.size > 0
     assert image_02.size > 0
@@ -142,172 +136,197 @@ def test_dissimilar_pair_can_be_loaded():
 
 def test_preprocessing_output():
     """
-    Check that preprocessing can process a real dataset image.
+    Check complete preprocessing pipeline.
     """
 
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
+    from src.preprocessing.image_preprocessor import (
+        preprocess_image
+    )
 
-    image_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
+    image_path = (
+        SIMILAR_DIR
+        / "pair_01"
+        / "image_01.jpg"
+    )
 
-    image = load_image(image_path)
-
-    preprocessor = ImagePreprocessor()
-
-    result = preprocessor.preprocess(image)
+    result = preprocess_image(
+        image_path,
+        size=(256, 256)
+    )
 
     assert result is not None
     assert isinstance(result, np.ndarray)
+
     assert result.size > 0
 
+    # Must be grayscale.
+    assert result.ndim == 2
+
+    # Must be float32.
+    assert result.dtype == np.float32
+
+    # Must be normalized.
+    assert result.min() >= 0.0
+    assert result.max() <= 1.0
+
+    # Expected size.
+    assert result.shape == (256, 256)
+
 
 # ---------------------------------------------------------------------------
-# Wavelet pipeline integration
+# Complete Wavelet pipeline
 # ---------------------------------------------------------------------------
 
-def _import_wavelet_modules():
+def _run_pipeline(image_path: Path):
     """
-    Import Wavelet modules.
-
-    The project currently contains placeholder files for some Wavelet
-    modules. If the required implementation is not available, the
-    integration test is skipped instead of failing because of an
-    unfinished module.
+    Run the actual project pipeline using function-based APIs.
     """
 
-    try:
-        from src.wavelet.wavelet_transform import WaveletTransform
-        from src.wavelet.wavelet_hash import WaveletHash
-        from src.similarity.hamming_distance import HammingDistance
+    from src.preprocessing.image_preprocessor import (
+        preprocess_image
+    )
 
-        return WaveletTransform, WaveletHash, HammingDistance
+    from src.wavelet.wavelet_transform import (
+        dwt2_image
+    )
 
-    except (ImportError, AttributeError):
-        pytest.skip(
-            "Wavelet Transform / Wavelet Hash / Hamming Distance "
-            "implementation is not available yet."
-        )
+    from src.wavelet.wavelet_hash import (
+        wavelet_hash
+    )
 
-
-def test_wavelet_pipeline_single_pair():
-    """
-    Test the complete processing flow for one Similar image pair.
-
-    This test verifies that:
-
-        image
-          ↓
-        preprocessing
-          ↓
-        wavelet transform
-          ↓
-        wavelet hash
-          ↓
-        hamming distance
-
-    can be connected successfully.
-    """
-
-    WaveletTransform, WaveletHash, HammingDistance = _import_wavelet_modules()
-
-    image_01_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
-    image_02_path = SIMILAR_DIR / "pair_01" / "image_02.jpg"
-
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
+    from src.similarity.hamming_distance import (
+        HammingDistance
+    )
 
     # ---------------------------------------------------------------
     # Step 1: Preprocessing
     # ---------------------------------------------------------------
 
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
+    processed = preprocess_image(
+        image_path,
+        size=(256, 256)
+    )
 
-    preprocessor = ImagePreprocessor()
-
-    processed_01 = preprocessor.preprocess(image_01)
-    processed_02 = preprocessor.preprocess(image_02)
-
-    assert processed_01 is not None
-    assert processed_02 is not None
+    assert processed is not None
+    assert processed.ndim == 2
 
     # ---------------------------------------------------------------
     # Step 2: Wavelet Transform
     # ---------------------------------------------------------------
 
-    wavelet_transform = WaveletTransform()
+    ll, details = dwt2_image(
+        processed,
+        wavelet="haar"
+    )
 
-    transformed_01 = wavelet_transform.transform(processed_01)
-    transformed_02 = wavelet_transform.transform(processed_02)
+    assert ll is not None
+    assert isinstance(ll, np.ndarray)
 
-    assert transformed_01 is not None
-    assert transformed_02 is not None
+    assert len(details) == 3
 
     # ---------------------------------------------------------------
     # Step 3: Wavelet Hash
+    #
+    # The hash function accepts an image.
+    # Use the LL approximation generated by DWT.
     # ---------------------------------------------------------------
 
-    wavelet_hash = WaveletHash()
+    hash_value = wavelet_hash(
+        processed,
+        wavelet="haar",
+        hash_size=(8, 8)
+    )
 
-    hash_01 = wavelet_hash.generate(transformed_01)
-    hash_02 = wavelet_hash.generate(transformed_02)
+    assert hash_value is not None
+    assert isinstance(hash_value, str)
 
-    assert hash_01 is not None
-    assert hash_02 is not None
+    assert len(hash_value) == 64
 
-    assert len(hash_01) == len(hash_02)
+    assert set(hash_value).issubset(
+        {"0", "1"}
+    )
+
+    return hash_value
+
+
+def test_wavelet_pipeline_single_pair():
+    """
+    Test complete processing flow for one Similar pair.
+    """
+
+    image_01_path = (
+        SIMILAR_DIR
+        / "pair_01"
+        / "image_01.jpg"
+    )
+
+    image_02_path = (
+        SIMILAR_DIR
+        / "pair_01"
+        / "image_02.jpg"
+    )
+
+    hash_01 = _run_pipeline(
+        image_01_path
+    )
+
+    hash_02 = _run_pipeline(
+        image_02_path
+    )
 
     # ---------------------------------------------------------------
     # Step 4: Hamming Distance
     # ---------------------------------------------------------------
 
+    from src.similarity.hamming_distance import (
+        HammingDistance
+    )
+
     hamming = HammingDistance()
 
-    distance = hamming.calculate(hash_01, hash_02)
+    distance = hamming.calculate(
+        hash_01,
+        hash_02
+    )
 
     assert distance is not None
-    assert isinstance(distance, (int, float))
+    assert isinstance(
+        distance,
+        int
+    )
+
     assert distance >= 0
+    assert distance <= 64
 
 
 # ---------------------------------------------------------------------------
-# Reproducibility test
+# Deterministic pipeline
 # ---------------------------------------------------------------------------
 
 def test_pipeline_is_deterministic():
     """
-    Processing the same image twice should produce the same hash.
-
-    This test is important because Wavelet Hash should be deterministic
-    for the same input and the same configuration.
+    Processing the same image twice must produce the same hash.
     """
 
-    WaveletTransform, WaveletHash, _ = _import_wavelet_modules()
+    image_path = (
+        SIMILAR_DIR
+        / "pair_01"
+        / "image_01.jpg"
+    )
 
-    image_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
+    hash_01 = _run_pipeline(
+        image_path
+    )
 
-    image = load_image(image_path)
-
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
-
-    preprocessor = ImagePreprocessor()
-
-    processed_01 = preprocessor.preprocess(image)
-    processed_02 = preprocessor.preprocess(image.copy())
-
-    wavelet_transform = WaveletTransform()
-
-    transformed_01 = wavelet_transform.transform(processed_01)
-    transformed_02 = wavelet_transform.transform(processed_02)
-
-    wavelet_hash = WaveletHash()
-
-    hash_01 = wavelet_hash.generate(transformed_01)
-    hash_02 = wavelet_hash.generate(transformed_02)
+    hash_02 = _run_pipeline(
+        image_path
+    )
 
     assert hash_01 == hash_02
 
 
 # ---------------------------------------------------------------------------
-# Similar and Dissimilar integration tests
+# Dataset pair structure
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
@@ -317,21 +336,32 @@ def test_pipeline_is_deterministic():
         DISSIMILAR_DIR,
     ],
 )
-def test_dataset_pairs_have_two_images(dataset_dir):
+def test_dataset_pairs_have_two_images(
+    dataset_dir
+):
     """
-    Check that every dataset pair contains exactly the required two images.
+    Check that every dataset pair contains two images.
     """
 
+    assert dataset_dir.exists(), (
+        f"Dataset directory does not exist: {dataset_dir}"
+    )
+
     pair_dirs = sorted(
-        path for path in dataset_dir.iterdir()
+        path
+        for path in dataset_dir.iterdir()
         if path.is_dir()
     )
 
-    assert pair_dirs, f"No pair directories found in {dataset_dir}"
+    assert pair_dirs, (
+        f"No pair directories found in {dataset_dir}"
+    )
 
     for pair_dir in pair_dirs:
 
-        image_01, image_02 = get_image_pair(pair_dir)
+        image_01, image_02 = get_image_pair(
+            pair_dir
+        )
 
         assert image_01.exists(), (
             f"Missing image_01.jpg in {pair_dir}"
@@ -342,6 +372,10 @@ def test_dataset_pairs_have_two_images(dataset_dir):
         )
 
 
+# ---------------------------------------------------------------------------
+# Dataset image readability
+# ---------------------------------------------------------------------------
+
 @pytest.mark.parametrize(
     "dataset_dir",
     [
@@ -349,401 +383,43 @@ def test_dataset_pairs_have_two_images(dataset_dir):
         DISSIMILAR_DIR,
     ],
 )
-def test_all_dataset_images_are_readable(dataset_dir):
+def test_all_dataset_images_are_readable(
+    dataset_dir
+):
     """
-    Check that all images in the dataset can be opened by OpenCV.
+    Check that all dataset images can be opened.
     """
 
+    assert dataset_dir.exists(), (
+        f"Dataset directory does not exist: {dataset_dir}"
+    )
+
     pair_dirs = sorted(
-        path for path in dataset_dir.iterdir()
+        path
+        for path in dataset_dir.iterdir()
         if path.is_dir()
+    )
+
+    assert pair_dirs, (
+        f"No pair directories found in {dataset_dir}"
     )
 
     for pair_dir in pair_dirs:
 
-        image_01_path, image_02_path = get_image_pair(pair_dir)
+        image_01_path, image_02_path = (
+            get_image_pair(pair_dir)
+        )
 
-        image_01 = load_image(image_01_path)
-        image_02 = load_image(image_02_path)
+        image_01 = load_image(
+            image_01_path
+        )
+
+        image_02 = load_image(
+            image_02_path
+        )
 
         assert image_01.ndim in (2, 3)
         assert image_02.ndim in (2, 3)
 
         assert image_01.size > 0
         assert image_02.size > 0
-
-=======
-
-"""
-Integration tests for the Wavelet Image Similarity pipeline.
-
-Pipeline:
-
-    Image
-      ↓
-    Preprocessing
-      ↓
-    Wavelet Transform
-      ↓
-    Wavelet Hash
-      ↓
-    Hamming Distance
-      ↓
-    Similarity
-
-These tests focus on the integration between modules rather than testing
-every internal implementation detail of each module.
-"""
-
-from pathlib import Path
-
-import cv2
-import numpy as np
-import pytest
-
-
-# ---------------------------------------------------------------------------
-# Project paths
-# ---------------------------------------------------------------------------
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-DATA_DIR = PROJECT_ROOT / "data" / "input"
-
-SIMILAR_DIR = DATA_DIR / "similar"
-DISSIMILAR_DIR = DATA_DIR / "dissimilar"
-
-
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
-
-def get_image_pair(pair_dir: Path):
-    """
-    Return image_01.jpg and image_02.jpg from a pair directory.
-
-    Parameters
-    ----------
-    pair_dir : Path
-        Directory containing image_01.jpg and image_02.jpg.
-
-    Returns
-    -------
-    tuple[Path, Path]
-        Paths to the two images.
-    """
-
-    image_01 = pair_dir / "image_01.jpg"
-    image_02 = pair_dir / "image_02.jpg"
-
-    return image_01, image_02
-
-
-def load_image(path: Path):
-    """
-    Load an image using OpenCV.
-
-    Raises
-    ------
-    AssertionError
-        If the image cannot be loaded.
-    """
-
-    assert path.exists(), f"Image does not exist: {path}"
-
-    image = cv2.imread(str(path))
-
-    assert image is not None, f"Could not load image: {path}"
-
-    return image
-
-
-# ---------------------------------------------------------------------------
-# Dataset tests
-# ---------------------------------------------------------------------------
-
-def test_similar_dataset_exists():
-    """Check that the Similar dataset exists."""
-
-    assert SIMILAR_DIR.exists(), (
-        f"Similar dataset does not exist: {SIMILAR_DIR}"
-    )
-
-
-def test_dissimilar_dataset_exists():
-    """Check that the Dissimilar dataset exists."""
-
-    assert DISSIMILAR_DIR.exists(), (
-        f"Dissimilar dataset does not exist: {DISSIMILAR_DIR}"
-    )
-
-
-def test_similar_pair_can_be_loaded():
-    """
-    Check that a Similar image pair can be loaded successfully.
-    """
-
-    pair_dir = SIMILAR_DIR / "pair_01"
-
-    image_01_path, image_02_path = get_image_pair(pair_dir)
-
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
-
-    assert image_01.size > 0
-    assert image_02.size > 0
-
-
-def test_dissimilar_pair_can_be_loaded():
-    """
-    Check that a Dissimilar image pair can be loaded successfully.
-    """
-
-    pair_dir = DISSIMILAR_DIR / "pair_01"
-
-    image_01_path, image_02_path = get_image_pair(pair_dir)
-
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
-
-    assert image_01.size > 0
-    assert image_02.size > 0
-
-
-# ---------------------------------------------------------------------------
-# Preprocessing integration
-# ---------------------------------------------------------------------------
-
-def test_preprocessing_output():
-    """
-    Check that preprocessing can process a real dataset image.
-    """
-
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
-
-    image_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
-
-    image = load_image(image_path)
-
-    preprocessor = ImagePreprocessor()
-
-    result = preprocessor.preprocess(image)
-
-    assert result is not None
-    assert isinstance(result, np.ndarray)
-    assert result.size > 0
-
-
-# ---------------------------------------------------------------------------
-# Wavelet pipeline integration
-# ---------------------------------------------------------------------------
-
-def _import_wavelet_modules():
-    """
-    Import Wavelet modules.
-
-    The project currently contains placeholder files for some Wavelet
-    modules. If the required implementation is not available, the
-    integration test is skipped instead of failing because of an
-    unfinished module.
-    """
-
-    try:
-        from src.wavelet.wavelet_transform import WaveletTransform
-        from src.wavelet.wavelet_hash import WaveletHash
-        from src.similarity.hamming_distance import HammingDistance
-
-        return WaveletTransform, WaveletHash, HammingDistance
-
-    except (ImportError, AttributeError):
-        pytest.skip(
-            "Wavelet Transform / Wavelet Hash / Hamming Distance "
-            "implementation is not available yet."
-        )
-
-
-def test_wavelet_pipeline_single_pair():
-    """
-    Test the complete processing flow for one Similar image pair.
-
-    This test verifies that:
-
-        image
-          ↓
-        preprocessing
-          ↓
-        wavelet transform
-          ↓
-        wavelet hash
-          ↓
-        hamming distance
-
-    can be connected successfully.
-    """
-
-    WaveletTransform, WaveletHash, HammingDistance = _import_wavelet_modules()
-
-    image_01_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
-    image_02_path = SIMILAR_DIR / "pair_01" / "image_02.jpg"
-
-    image_01 = load_image(image_01_path)
-    image_02 = load_image(image_02_path)
-
-    # ---------------------------------------------------------------
-    # Step 1: Preprocessing
-    # ---------------------------------------------------------------
-
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
-
-    preprocessor = ImagePreprocessor()
-
-    processed_01 = preprocessor.preprocess(image_01)
-    processed_02 = preprocessor.preprocess(image_02)
-
-    assert processed_01 is not None
-    assert processed_02 is not None
-
-    # ---------------------------------------------------------------
-    # Step 2: Wavelet Transform
-    # ---------------------------------------------------------------
-
-    wavelet_transform = WaveletTransform()
-
-    transformed_01 = wavelet_transform.transform(processed_01)
-    transformed_02 = wavelet_transform.transform(processed_02)
-
-    assert transformed_01 is not None
-    assert transformed_02 is not None
-
-    # ---------------------------------------------------------------
-    # Step 3: Wavelet Hash
-    # ---------------------------------------------------------------
-
-    wavelet_hash = WaveletHash()
-
-    hash_01 = wavelet_hash.generate(transformed_01)
-    hash_02 = wavelet_hash.generate(transformed_02)
-
-    assert hash_01 is not None
-    assert hash_02 is not None
-
-    assert len(hash_01) == len(hash_02)
-
-    # ---------------------------------------------------------------
-    # Step 4: Hamming Distance
-    # ---------------------------------------------------------------
-
-    hamming = HammingDistance()
-
-    distance = hamming.calculate(hash_01, hash_02)
-
-    assert distance is not None
-    assert isinstance(distance, (int, float))
-    assert distance >= 0
-
-
-# ---------------------------------------------------------------------------
-# Reproducibility test
-# ---------------------------------------------------------------------------
-
-def test_pipeline_is_deterministic():
-    """
-    Processing the same image twice should produce the same hash.
-
-    This test is important because Wavelet Hash should be deterministic
-    for the same input and the same configuration.
-    """
-
-    WaveletTransform, WaveletHash, _ = _import_wavelet_modules()
-
-    image_path = SIMILAR_DIR / "pair_01" / "image_01.jpg"
-
-    image = load_image(image_path)
-
-    from src.preprocessing.image_preprocessor import ImagePreprocessor
-
-    preprocessor = ImagePreprocessor()
-
-    processed_01 = preprocessor.preprocess(image)
-    processed_02 = preprocessor.preprocess(image.copy())
-
-    wavelet_transform = WaveletTransform()
-
-    transformed_01 = wavelet_transform.transform(processed_01)
-    transformed_02 = wavelet_transform.transform(processed_02)
-
-    wavelet_hash = WaveletHash()
-
-    hash_01 = wavelet_hash.generate(transformed_01)
-    hash_02 = wavelet_hash.generate(transformed_02)
-
-    assert hash_01 == hash_02
-
-
-# ---------------------------------------------------------------------------
-# Similar and Dissimilar integration tests
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize(
-    "dataset_dir",
-    [
-        SIMILAR_DIR,
-        DISSIMILAR_DIR,
-    ],
-)
-def test_dataset_pairs_have_two_images(dataset_dir):
-    """
-    Check that every dataset pair contains exactly the required two images.
-    """
-
-    pair_dirs = sorted(
-        path for path in dataset_dir.iterdir()
-        if path.is_dir()
-    )
-
-    assert pair_dirs, f"No pair directories found in {dataset_dir}"
-
-    for pair_dir in pair_dirs:
-
-        image_01, image_02 = get_image_pair(pair_dir)
-
-        assert image_01.exists(), (
-            f"Missing image_01.jpg in {pair_dir}"
-        )
-
-        assert image_02.exists(), (
-            f"Missing image_02.jpg in {pair_dir}"
-        )
-
-
-@pytest.mark.parametrize(
-    "dataset_dir",
-    [
-        SIMILAR_DIR,
-        DISSIMILAR_DIR,
-    ],
-)
-def test_all_dataset_images_are_readable(dataset_dir):
-    """
-    Check that all images in the dataset can be opened by OpenCV.
-    """
-
-    pair_dirs = sorted(
-        path for path in dataset_dir.iterdir()
-        if path.is_dir()
-    )
-
-    for pair_dir in pair_dirs:
-
-        image_01_path, image_02_path = get_image_pair(pair_dir)
-
-        image_01 = load_image(image_01_path)
-        image_02 = load_image(image_02_path)
-
-        assert image_01.ndim in (2, 3)
-        assert image_02.ndim in (2, 3)
-
-        assert image_01.size > 0
-        assert image_02.size > 0
-
->>>>>>> f28b4cd ( cap nhat)

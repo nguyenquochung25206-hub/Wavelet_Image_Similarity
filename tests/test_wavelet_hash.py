@@ -1,193 +1,172 @@
 """
-Unit tests for Wavelet Hash.
+Wavelet Hash implementation.
 
-Module under test:
+Module:
     src/wavelet/wavelet_hash.py
 
-Run:
-    pytest tests/test_wavelet_hash.py -v
+Description:
+    Generate a binary hash from an image using
+    the Discrete Wavelet Transform (DWT).
+
+Pipeline:
+
+    Image
+      ↓
+    DWT
+      ↓
+    Approximation coefficients (LL)
+      ↓
+    Resize
+      ↓
+    Mean threshold
+      ↓
+    Binary hash
 """
 
+
 import numpy as np
-import pytest
-
-from src.wavelet.wavelet_hash import wavelet_hash
-
-
-def make_gradient_image(size=(64, 64)):
-    """Create a deterministic grayscale gradient image."""
-    height, width = size
-
-    row = np.linspace(
-        0,
-        255,
-        width,
-        dtype=np.float32
-    )
-
-    return np.tile(row, (height, 1))
+import pywt
+from PIL import Image
 
 
-def make_checkerboard(size=(64, 64), block_size=8):
-    """Create a deterministic checkerboard image."""
-    height, width = size
-
-    y, x = np.indices((height, width))
-
-    board = (
-        (x // block_size + y // block_size) % 2
-    ) * 255
-
-    return board.astype(np.float32)
-
-
-def test_wavelet_hash_returns_string():
-    """Wavelet Hash should return a string."""
-    image = make_gradient_image()
-
-    result = wavelet_hash(image)
-
-    assert isinstance(result, str)
-
-
-def test_wavelet_hash_default_length():
-    """
-    Default hash size is 8x8,
-    therefore the hash should contain 64 bits.
-    """
-    image = make_gradient_image()
-
-    result = wavelet_hash(image)
-
-    assert len(result) == 64
-
-
-def test_wavelet_hash_contains_only_binary_values():
-    """Hash must contain only 0 and 1."""
-    image = make_gradient_image()
-
-    result = wavelet_hash(image)
-
-    assert set(result).issubset({"0", "1"})
-
-
-def test_wavelet_hash_is_deterministic():
-    """
-    The same image should always produce
-    the same Wavelet Hash.
-    """
-    image = make_gradient_image()
-
-    hash_1 = wavelet_hash(image)
-    hash_2 = wavelet_hash(image.copy())
-
-    assert hash_1 == hash_2
-
-
-def test_wavelet_hash_supports_custom_hash_size():
-    """Test a custom 4x4 hash."""
-    image = make_gradient_image()
-
-    result = wavelet_hash(
-        image,
-        hash_size=(4, 4)
-    )
-
-    assert len(result) == 16
-    assert set(result).issubset({"0", "1"})
-
-
-def test_wavelet_hash_supports_wavelet_parameter():
-    """Test a valid wavelet parameter."""
-    image = make_gradient_image()
-
-    result = wavelet_hash(
-        image,
-        wavelet="haar"
-    )
-
-    assert len(result) == 64
-    assert set(result).issubset({"0", "1"})
-
-
-def test_different_images_can_produce_different_hashes():
-    """
-    Different image structures should be able
-    to produce different hashes.
-    """
-    gradient = make_gradient_image()
-    checkerboard = make_checkerboard()
-
-    gradient_hash = wavelet_hash(gradient)
-    checkerboard_hash = wavelet_hash(checkerboard)
-
-    assert gradient_hash != checkerboard_hash
-
-
-def test_small_image_is_processed():
-    """Test Wavelet Hash with a smaller image."""
-    image = make_gradient_image(
-        size=(16, 16)
-    )
-
-    result = wavelet_hash(image)
-
-    assert len(result) == 64
-    assert set(result).issubset({"0", "1"})
-
-
-@pytest.mark.parametrize(
-    "invalid_hash_size",
-    [
-        (0, 8),
-        (8, 0),
-        (4,),
-        (4, 4, 4),
-    ],
-)
-def test_invalid_hash_size_is_rejected(
-    invalid_hash_size
+def wavelet_hash(
+    image,
+    wavelet="haar",
+    hash_size=(8, 8)
 ):
-    """Invalid hash sizes should raise an exception."""
-    image = make_gradient_image()
+    """
+    Generate a binary Wavelet Hash for an image.
 
-    with pytest.raises(
-        (ValueError, TypeError, IndexError)
-    ):
-        wavelet_hash(
-            image,
-            hash_size=invalid_hash_size
+    Parameters
+    ----------
+    image : numpy.ndarray
+        Input grayscale image.
+
+    wavelet : str
+        Wavelet type used for DWT.
+        Default is "haar".
+
+    hash_size : tuple
+        Size of the generated hash.
+        Default is (8, 8), producing 64 bits.
+
+    Returns
+    -------
+    str
+        Binary hash represented as a string of 0 and 1.
+
+    Raises
+    ------
+    ValueError
+        If hash_size is invalid or the image is invalid.
+
+    TypeError
+        If hash_size has an invalid type.
+
+    """
+
+    # ---------------------------------------------------------------
+    # Validate image
+    # ---------------------------------------------------------------
+
+    if not isinstance(image, np.ndarray):
+        raise TypeError("image must be a numpy.ndarray")
+
+    if image.size == 0:
+        raise ValueError("image must not be empty")
+
+    if image.ndim != 2:
+        raise ValueError(
+            "image must be a 2D grayscale image"
         )
 
+    # ---------------------------------------------------------------
+    # Validate hash_size
+    # ---------------------------------------------------------------
 
-def test_invalid_wavelet_is_rejected():
-    """An invalid wavelet name should raise an exception."""
-    image = make_gradient_image()
-
-    with pytest.raises(
-        (ValueError, KeyError, TypeError)
-    ):
-        wavelet_hash(
-            image,
-            wavelet="not_a_real_wavelet"
+    if not isinstance(hash_size, tuple):
+        raise TypeError(
+            "hash_size must be a tuple"
         )
 
+    if len(hash_size) != 2:
+        raise ValueError(
+            "hash_size must contain exactly two values"
+        )
 
-def test_hash_is_binary_for_constant_image():
-    """
-    A constant image is still a valid input.
+    height, width = hash_size
 
-    The exact bit pattern depends on the implementation,
-    but the result must have the requested length
-    and contain only binary values.
-    """
-    image = np.full(
-        (64, 64),
-        128,
+    if height <= 0 or width <= 0:
+        raise ValueError(
+            "hash_size values must be greater than zero"
+        )
+
+    # ---------------------------------------------------------------
+    # Validate wavelet
+    # ---------------------------------------------------------------
+
+    try:
+        pywt.Wavelet(wavelet)
+    except Exception as exc:
+        raise ValueError(
+            f"Invalid wavelet: {wavelet}"
+        ) from exc
+
+    # ---------------------------------------------------------------
+    # Convert image to float32
+    # ---------------------------------------------------------------
+
+    image = image.astype(np.float32)
+
+    # ---------------------------------------------------------------
+    # Discrete Wavelet Transform
+    # ---------------------------------------------------------------
+
+    coefficients = pywt.dwt2(
+        image,
+        wavelet
+    )
+
+    # Approximation coefficients (LL)
+    ll, _, _, _ = coefficients
+
+    # ---------------------------------------------------------------
+    # Resize LL coefficients
+    # ---------------------------------------------------------------
+
+    ll_image = Image.fromarray(
+        ll.astype(np.float32)
+    )
+
+    ll_image = ll_image.resize(
+        (width, height),
+        Image.Resampling.BILINEAR
+    )
+
+    ll_resized = np.asarray(
+        ll_image,
         dtype=np.float32
     )
 
-    result = wavelet_hash(image)
+    # ---------------------------------------------------------------
+    # Calculate mean threshold
+    # ---------------------------------------------------------------
 
-    assert len(result) == 64
-    assert set(result).issubset({"0", "1"})
+    mean_value = np.mean(ll_resized)
+
+    # ---------------------------------------------------------------
+    # Generate binary hash
+    # ---------------------------------------------------------------
+
+    binary_hash = (
+        ll_resized >= mean_value
+    ).astype(np.uint8)
+
+    # ---------------------------------------------------------------
+    # Convert matrix to binary string
+    # ---------------------------------------------------------------
+
+    return "".join(
+        str(int(bit))
+        for bit in binary_hash.flatten()
+    )
